@@ -44,6 +44,27 @@ print(f"[*] Detected FFmpeg at: {FFMPEG_PATH or 'Not found'}", flush=True)
 download_tasks = {}
 
 
+def cleanup_old_files():
+    """Periodically clean up downloaded files older than 30 minutes to save disk space."""
+    while True:
+        try:
+            now = datetime.now().timestamp()
+            for filename in os.listdir(DOWNLOAD_DIR):
+                filepath = os.path.join(DOWNLOAD_DIR, filename)
+                if os.path.isfile(filepath) and not filename.startswith("."):
+                    if now - os.path.getmtime(filepath) > 1800:  # 30 minutes
+                        try:
+                            os.remove(filepath)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+        threading.Event().wait(600)  # Check every 10 minutes
+
+
+threading.Thread(target=cleanup_old_files, daemon=True).start()
+
+
 def format_bytes(b):
     if not b:
         return "0 MB"
@@ -348,16 +369,19 @@ def get_file(file_id):
 
 
 if __name__ == "__main__":
-    import webbrowser
-
-    port = 5000
-    host = "127.0.0.1"
+    port = int(os.environ.get("PORT", 5000))
+    is_cloud = os.environ.get("PORT") is not None
+    host = "0.0.0.0" if is_cloud else "127.0.0.1"
     url = f"http://{host}:{port}"
 
     print("\n" + "=" * 55)
-    print("  YouTube Downloader Web App Running!")
-    print(f"  Open your browser: {url}")
+    print("  🚀 YouTube Downloader Web App Running!")
+    print(f"  👉 Listening at: {url}")
     print("=" * 55 + "\n", flush=True)
 
-    threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+    if not is_cloud:
+        import webbrowser
+        threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
+
     app.run(host=host, port=port, threaded=True, debug=False)
+
